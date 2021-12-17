@@ -335,6 +335,13 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
         }
         $this->bigbluebuttonbn_mform_add_element($mform, $field['type'], $field['name'], $field['data_type'],
             $field['description_key'], $cfg['waitformoderator_default']);
+
+        ///// START MR Added 2021 06 03
+        $field = ['type' => 'checkbox', 'name' => 'uniqueusersessions', 'data_type' => PARAM_INT, 'description_key' => 'mod_form_field_uniqueusersessions'];
+        $this->bigbluebuttonbn_mform_add_element($mform, $field['type'], $field['name'], $field['data_type'],
+            $field['description_key'], 0);
+        ///// END  MR Added 2021 06 03
+        
         $field = ['type' => 'hidden', 'name' => 'userlimit', 'data_type' => PARAM_INT, 'description_key' => null];
         if ($cfg['userlimit_editable']) {
             $field['type'] = 'text';

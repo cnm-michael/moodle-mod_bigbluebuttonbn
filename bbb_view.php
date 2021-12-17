@@ -113,6 +113,12 @@ if ($timeline || $index) {
     $SESSION->bigbluebuttonbn_bbbsession = $bbbsession;
 }
 
+if ($bbbsession['uniqueusersessions']) {
+    // Assign group default values.
+    $bbbsession['meetingid'] .= '[' . $bbbsession['studentnumber'] . ' - ' . $bbbsession['username'] . ']';
+    $bbbsession['meetingname'] .= ' (' . $bbbsession['studentnumber'] . ' - ' . $bbbsession['username'] . ')';
+}
+
 // Print the page header.
 $PAGE->set_context($context);
 $PAGE->set_url('/mod/bigbluebuttonbn/bbb_view.php', array('id' => $cm->id, 'bigbluebuttonbn' => $bigbluebuttonbn->id));

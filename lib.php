@@ -712,6 +712,9 @@ function bigbluebuttonbn_process_pre_save_checkboxes(&$bigbluebuttonbn) {
     if (!isset($bigbluebuttonbn->wait)) {
         $bigbluebuttonbn->wait = 0;
     }
+    if (!isset($bigbluebuttonbn->uniqueusersessions)) {
+        $bigbluebuttonbn->uniqueusersessions = 0;
+    }
     if (!isset($bigbluebuttonbn->record)) {
         $bigbluebuttonbn->record = 0;
     }

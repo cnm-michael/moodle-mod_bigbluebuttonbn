@@ -327,6 +327,12 @@ $string['mod_form_field_voicebridge_help'] = 'Voice conference number that parti
 $string['mod_form_field_voicebridge_format_error'] = 'Format error. You should input a number between 1 and 9999.';
 $string['mod_form_field_voicebridge_notunique_error'] = 'Not a unique value. This number is being used by another room or conference.';
 $string['mod_form_field_wait'] = 'Wait for moderator';
+
+///// START MR Added 2021 06 03
+$string['mod_form_field_uniqueusersessions'] = 'Separate BBB sessions for each user';
+$string['mod_form_field_uniqueusersessions_help'] = 'Each user will be in their own video session separate from other users.';
+///// END  MR Added 2021 06 03
+
 $string['mod_form_field_wait_help'] = 'Viewers must wait until a moderator enters the session before they can do so';
 $string['mod_form_field_welcome'] = 'Welcome message';
 $string['mod_form_field_welcome_help'] = 'Replaces the default message setted up for the BigBlueButton server. The message can includes keywords  (%%CONFNAME%%, %%DIALNUM%%, %%CONFNUM%%) which will be substituted automatically, and also html tags like &lt;b>...&lt;/b>, &lt;br />, &lt;u>&lt;/u> or &lt;i>&lt;/i> ';

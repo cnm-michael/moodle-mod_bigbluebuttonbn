@@ -463,9 +463,11 @@ class mod_bigbluebuttonbn_lib_testcase extends advanced_testcase {
         list($bbactivitycontext, $bbactivitycm, $bbactivity) = $this->create_instance();
         $bbformdata = $this->get_form_data_from_instance($bbactivity);
         unset($bbformdata->wait);
+        unset($bbformdata->uniqueusersessions);
         unset($bbformdata->recordallfromstart);
         bigbluebuttonbn_process_pre_save_checkboxes($bbformdata);
         $this->assertTrue(isset($bbformdata->wait));
+        $this->assertTrue(isset($bbformdata->uniqueusersessions));
         $this->assertTrue(isset($bbformdata->recordallfromstart));
     }
 

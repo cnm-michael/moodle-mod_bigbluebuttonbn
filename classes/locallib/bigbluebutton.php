@@ -180,6 +180,7 @@ class bigbluebutton {
 
         $bbbsession['username'] = fullname($USER);
         $bbbsession['userID'] = $USER->id;
+        $bbbsession['studentnumber'] = $USER->username;
         $bbbsession['administrator'] = is_siteadmin($bbbsession['userID']);
         $participantlist = bigbluebuttonbn_get_participant_list($bbbsession['bigbluebuttonbn'], $context);
         $bbbsession['moderator'] = bigbluebuttonbn_is_moderator($context, $participantlist);
@@ -201,6 +202,7 @@ class bigbluebutton {
             $bbbsession['voicebridge'] = 70000 + $bbbsession['bigbluebuttonbn']->voicebridge;
         }
         $bbbsession['wait'] = $bbbsession['bigbluebuttonbn']->wait;
+        $bbbsession['uniqueusersessions'] = $bbbsession['bigbluebuttonbn']->uniqueusersessions;
         $bbbsession['record'] = $bbbsession['bigbluebuttonbn']->record;
         $bbbsession['recordallfromstart'] = $CFG->bigbluebuttonbn_recording_all_from_start_default;
         if ($CFG->bigbluebuttonbn_recording_all_from_start_editable) {
