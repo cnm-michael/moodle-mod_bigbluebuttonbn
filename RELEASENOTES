@@ -1,3 +1,22 @@
+2.4.4 (2019101011)
+Bug: Fix for users and roles should be sorted alphabetically (CONTRIB-8113).
+Bug: Fix for compatibility with protected recordings when BBB implements that.
+
+2.4.3 (2019101010)
+Bug: Fix default welcome message (CONTRIB-8573).
+Bug: Fix for issue with Imported recordings (CONTRIB-8580).
+Bug: Fix preuploading presentation process (CONTRIB-8587).
+Enhancement: Add option to allow teachers to edit the welcome message (CONTRIB-8574).
+Enhancement: Disable notification on recording ready callback (CONTRIB-8591).
+
+2.4.2 (2019101009)
+Bug: Fix for issue with bigbluebuttonbn_welcome_default considered not valid (CONTRIB-8435).
+Bug: Fix for issue with BBB Server being spammed on calendar dashboard view (CONTRIB-8419).
+Bug: Fix for issue with import recording page layout being broken (CONTRIB-8566).
+Bug: Fix for issue with activity always visible in the calendar (CONTRIB-8461).
+Bug: Fix for regresion on issue with activities are not being listed in Timeline tab of Course overview block (CONTRIB-7377).
+Bug: Fix for issue with manager not being able to see import links from all courses (CONTRIB-8489).
+
 2.4.1 (2019101008)
 Hot-fix: Patch for issue with Completion caused blocks view to crash (CONTRIB-8551).
 

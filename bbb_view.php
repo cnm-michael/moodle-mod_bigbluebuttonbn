@@ -24,6 +24,7 @@
  */
 
 use mod_bigbluebuttonbn\locallib\bigbluebutton;
+use mod_bigbluebuttonbn\plugin;
 
 require_once(dirname(dirname(dirname(__FILE__))).'/config.php');
 require_once(dirname(__FILE__).'/locallib.php');
@@ -33,7 +34,6 @@ global $SESSION;
 $action = required_param('action', PARAM_TEXT);
 $id = optional_param('id', 0, PARAM_INT);
 $bn = optional_param('bn', 0, PARAM_INT);
-$href = optional_param('href', '', PARAM_TEXT);
 $mid = optional_param('mid', '', PARAM_TEXT);
 $rid = optional_param('rid', '', PARAM_TEXT);
 $rtype = optional_param('rtype', 'presentation', PARAM_TEXT);
@@ -44,7 +44,7 @@ $group = optional_param('group', -1, PARAM_INT);
 
 $bbbviewinstance = bigbluebuttonbn_view_validator($id, $bn);
 if (!$bbbviewinstance) {
-    print_error(get_string('view_error_url_missing_parameters', 'bigbluebuttonbn'));
+    throw new moodle_exception(get_string('view_error_url_missing_parameters', plugin::COMPONENT));
 }
 
 $cm = $bbbviewinstance['cm'];
@@ -64,16 +64,16 @@ if ($timeline || $index) {
     $serverversion = bigbluebuttonbn_get_server_version();
     if (is_null($serverversion)) {
         if ($bbbsession['administrator']) {
-            print_error('view_error_unable_join', 'bigbluebuttonbn',
+            throw new moodle_exception('view_error_unable_join', plugin::COMPONENT,
                 $CFG->wwwroot.'/admin/settings.php?section=modsettingbigbluebuttonbn');
             exit;
         }
         if ($bbbsession['moderator']) {
-            print_error('view_error_unable_join_teacher', 'bigbluebuttonbn',
+            throw new moodle_exception('view_error_unable_join_teacher', plugin::COMPONENT,
                 $CFG->wwwroot.'/course/view.php?id='.$bigbluebuttonbn->course);
             exit;
         }
-        print_error('view_error_unable_join_student', 'bigbluebuttonbn',
+        throw new moodle_exception('view_error_unable_join_student', plugin::COMPONENT,
             $CFG->wwwroot.'/course/view.php?id='.$bigbluebuttonbn->course);
         exit;
     }
@@ -105,12 +105,18 @@ if ($timeline || $index) {
             $bbbsession['meetingid'] .= '[' . $bbbsession['group'] . ']';
             $bbbsession['meetingname'] .= ' (' . $groupname . ')';
         } else {
-            print_error('invalidaccess');
+            throw new moodle_exception('invalidaccess', plugin::COMPONENT);
         }
     }
 
     // Initialize session variable used across views.
     $SESSION->bigbluebuttonbn_bbbsession = $bbbsession;
+}
+
+if ($bbbsession['uniqueusersessions']) {
+    // Assign group default values.
+    $bbbsession['meetingid'] .= '[' . $bbbsession['studentnumber'] . ' - ' . $bbbsession['username'] . ']';
+    $bbbsession['meetingname'] .= ' (' . $bbbsession['studentnumber'] . ' - ' . $bbbsession['username'] . ')';
 }
 
 // Print the page header.
@@ -153,7 +159,7 @@ switch (strtolower($action)) {
         break;
     case 'join':
         if (is_null($bbbsession)) {
-            print_error('view_error_unable_join', 'bigbluebuttonbn');
+            throw new moodle_exception('view_error_unable_join', plugin::COMPONENT);
             break;
         }
         // Check the origin page.
@@ -184,31 +190,31 @@ switch (strtolower($action)) {
         if (empty($response)) {
             // The server is unreachable.
             if ($bbbsession['administrator']) {
-                print_error('view_error_unable_join', 'bigbluebuttonbn',
+                throw new moodle_exception('view_error_unable_join', plugin::COMPONENT,
                     $CFG->wwwroot.'/admin/settings.php?section=modsettingbigbluebuttonbn');
                 break;
             }
             if ($bbbsession['moderator']) {
-                print_error('view_error_unable_join_teacher', 'bigbluebuttonbn',
+                throw new moodle_exception('view_error_unable_join_teacher', plugin::COMPONENT,
                     $CFG->wwwroot.'/admin/settings.php?section=modsettingbigbluebuttonbn');
                 break;
             }
-            print_error('view_error_unable_join_student', 'bigbluebuttonbn',
+            throw new moodle_exception('view_error_unable_join_student', plugin::COMPONENT,
                 $CFG->wwwroot.'/admin/settings.php?section=modsettingbigbluebuttonbn');
             break;
         }
         if ($response['returncode'] == 'FAILED') {
             // The meeting was not created.
             if (!$printerrorkey) {
-                print_error($response['message'], 'bigbluebuttonbn');
+                throw new moodle_exception($response['message'], plugin::COMPONENT);
                 break;
             }
             $printerrorkey = bigbluebuttonbn_get_error_key($response['messageKey'], 'view_error_create');
-            print_error($printerrorkey, 'bigbluebuttonbn');
+            throw new moodle_exception($printerrorkey, plugin::COMPONENT);
             break;
         }
         if ($response['hasBeenForciblyEnded'] == 'true') {
-            print_error(get_string('index_error_forciblyended', 'bigbluebuttonbn'));
+            throw new moodle_exception(get_string('index_error_forciblyended', plugin::COMPONENT));
             break;
         }
         // Moodle event logger: Create an event for meeting created.
@@ -221,7 +227,7 @@ switch (strtolower($action)) {
         bigbluebuttonbn_bbb_view_join_meeting($bbbsession, $bigbluebuttonbn, $origin);
         break;
     case 'play':
-        $href = bigbluebuttonbn_bbb_view_playback_href($href, $mid, $rid, $rtype);
+        $href = bigbluebuttonbn_bbb_view_playback_href($mid, $rid, $rtype);
         // Moodle event logger: Create an event for meeting left.
         bigbluebuttonbn_event_log(\mod_bigbluebuttonbn\event\events::$events['recording_play'], $bigbluebuttonbn,
             ['other' => $rid]);
@@ -238,16 +244,12 @@ switch (strtolower($action)) {
 /**
  * Helper for getting the playback url that corresponds to an specific type.
  *
- * @param  string   $href
  * @param  string   $mid
  * @param  string   $rid
  * @param  string   $rtype
  * @return string
  */
-function bigbluebuttonbn_bbb_view_playback_href($href, $mid, $rid, $rtype) {
-    if ($href != '' || $mid == '' || $rid == '') {
-        return $href;
-    }
+function bigbluebuttonbn_bbb_view_playback_href($mid, $rid, $rtype) {
     $recordings = bigbluebuttonbn_get_recordings_array($mid, $rid);
     if (empty($recordings)) {
         return '';
@@ -456,7 +458,7 @@ function bigbluebuttonbn_bbb_view_errors($serrors, $id) {
         $msgerrors .= html_writer::tag('p', $error->{'message'}, array('class' => 'alert alert-danger'))."\n";
     }
     echo $OUTPUT->header();
-    print_error('view_error_bigbluebutton', 'bigbluebuttonbn',
+    throw new moodle_exception('view_error_bigbluebutton', plugin::COMPONENT,
         $CFG->wwwroot.'/mod/bigbluebuttonbn/view.php?id='.$id, $msgerrors, $serrors);
     echo $OUTPUT->footer();
 }

@@ -180,6 +180,7 @@ class bigbluebutton {
 
         $bbbsession['username'] = fullname($USER);
         $bbbsession['userID'] = $USER->id;
+        $bbbsession['studentnumber'] = $USER->username;
         $bbbsession['administrator'] = is_siteadmin($bbbsession['userID']);
         $participantlist = bigbluebuttonbn_get_participant_list($bbbsession['bigbluebuttonbn'], $context);
         $bbbsession['moderator'] = bigbluebuttonbn_is_moderator($context, $participantlist);
@@ -201,6 +202,7 @@ class bigbluebutton {
             $bbbsession['voicebridge'] = 70000 + $bbbsession['bigbluebuttonbn']->voicebridge;
         }
         $bbbsession['wait'] = $bbbsession['bigbluebuttonbn']->wait;
+        $bbbsession['uniqueusersessions'] = $bbbsession['bigbluebuttonbn']->uniqueusersessions;
         $bbbsession['record'] = $bbbsession['bigbluebuttonbn']->record;
         $bbbsession['recordallfromstart'] = $CFG->bigbluebuttonbn_recording_all_from_start_default;
         if ($CFG->bigbluebuttonbn_recording_all_from_start_editable) {
@@ -211,8 +213,12 @@ class bigbluebutton {
             $bbbsession['recordhidebutton'] = $bbbsession['bigbluebuttonbn']->recordhidebutton;
         }
         $bbbsession['welcome'] = $bbbsession['bigbluebuttonbn']->welcome;
-        if (!isset($bbbsession['welcome']) || $bbbsession['welcome'] == '') {
-            $bbbsession['welcome'] = get_string('mod_form_field_welcome_default', 'bigbluebuttonbn');
+        if (!isset($bbbsession['welcome']) || $bbbsession['welcome'] == '' || !config::get('welcome_editable')) {
+            // CONTRIB-8573: default to the config and if empty, then the default string.
+            $bbbsession['welcome'] = config::get('welcome_default');
+            if (!$bbbsession['welcome']) {
+                $bbbsession['welcome'] = get_string('mod_form_field_welcome_default', 'bigbluebuttonbn');
+            }
         }
         if ($bbbsession['bigbluebuttonbn']->record) {
             // Check if is enable record all from start.
@@ -298,8 +304,8 @@ class bigbluebutton {
      * @param $groupid
      * @param $user
      * @param $course
+     * @param $cm
      * @return bool
-     * @throws \coding_exception
      */
     public static function user_can_access_groups($groupid, $user, $course, $cm) {
         $groupmode = groups_get_activity_groupmode($cm);

@@ -24,6 +24,9 @@
  * @author    Fred Dixon  (ffdixon [at] blindsidenetworks [dt] com)
  */
 
+use mod_bigbluebuttonbn\locallib\config;
+use mod_bigbluebuttonbn\plugin;
+
 defined('MOODLE_INTERNAL') || die();
 
 require_once(dirname(__FILE__).'/locallib.php');
@@ -49,16 +52,15 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
         // Validates if the BigBlueButton server is running.
         $serverversion = bigbluebuttonbn_get_server_version();
         if (is_null($serverversion)) {
-            print_error('general_error_unable_connect', 'bigbluebuttonbn',
+            throw new moodle_exception('general_error_unable_connect', plugin::COMPONENT,
                 $CFG->wwwroot.'/admin/settings.php?section=modsettingbigbluebuttonbn');
-            return;
         }
         $bigbluebuttonbn = null;
         if ($this->current->id) {
             $bigbluebuttonbn = $DB->get_record('bigbluebuttonbn', array('id' => $this->current->id), '*', MUST_EXIST);
         }
         // UI configuration options.
-        $cfg = \mod_bigbluebuttonbn\locallib\config::get_options();
+        $cfg = config::get_options();
 
         $jsvars = array();
 
@@ -79,9 +81,8 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
                 );
             // If still none is allowed, fail and return.
             if (empty($jsvars['instanceTypeProfiles'])) {
-                print_error('general_error_not_allowed_to_create_instances)', 'bigbluebuttonbn',
+                throw new moodle_exception('general_error_not_allowed_to_create_instances)', plugin::COMPONENT,
                     $CFG->wwwroot.'/admin/settings.php?section=modsettingbigbluebuttonbn');
-                return;
             }
         }
         $jsvars['instanceTypeDefault'] = array_keys($jsvars['instanceTypeProfiles'])[0];
@@ -156,7 +157,7 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
      *
      * @param array $data
      * @param array $files
-     * @return void
+     * @return array
      */
     public function validation($data, $files) {
         $errors = parent::validation($data, $files);
@@ -182,7 +183,7 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
      */
     public function add_completion_rules() {
         $mform = $this->_form;
-        if (!(boolean)\mod_bigbluebuttonbn\locallib\config::get('meetingevents_enabled')) {
+        if (!(boolean) config::get('meetingevents_enabled')) {
             return [];
         }
 
@@ -259,7 +260,7 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
      * @return void
      */
     private function bigbluebuttonbn_mform_add_block_profiles(&$mform, $profiles) {
-        if ((boolean)\mod_bigbluebuttonbn\locallib\config::recordings_enabled()) {
+        if ((boolean) config::recordings_enabled()) {
             $mform->addElement('select', 'type', get_string('mod_form_field_instanceprofiles', 'bigbluebuttonbn'),
                 bigbluebuttonbn_get_instance_profiles_array($profiles),
                 array('onchange' => 'M.mod_bigbluebuttonbn.modform.updateInstanceTypeProfile(this);'));
@@ -300,10 +301,18 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
      * @return void
      */
     private function bigbluebuttonbn_mform_add_block_room_room(&$mform, $cfg) {
-        $field = ['type' => 'textarea', 'name' => 'welcome', 'data_type' => PARAM_CLEANHTML,
-            'description_key' => 'mod_form_field_welcome'];
+        $field = ['type' => 'hidden', 'name' => 'welcome', 'data_type' => PARAM_CLEANHTML,
+            'description_key' => null, 'default' => null, 'attributes' => null];
+        if ($cfg['welcome_editable']) {
+            $field['type'] = 'textarea';
+            $field['data_type'] = PARAM_CLEANHTML;
+            $field['default'] = $cfg['welcome_default'];
+            $field['attributes'] = ['wrap' => 'virtual', 'rows' => 5, 'cols' => '60'];
+            $field['description_key'] = 'mod_form_field_welcome';
+        }
         $this->bigbluebuttonbn_mform_add_element($mform, $field['type'], $field['name'], $field['data_type'],
-            $field['description_key'], $cfg['welcome_default'], ['wrap' => 'virtual', 'rows' => 5, 'cols' => '60']);
+            $field['description_key'], $field['default'], $field['attributes']);
+
         $field = ['type' => 'hidden', 'name' => 'voicebridge', 'data_type' => PARAM_INT,
             'description_key' => null];
         if ($cfg['voicebridge_editable']) {
@@ -326,6 +335,13 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
         }
         $this->bigbluebuttonbn_mform_add_element($mform, $field['type'], $field['name'], $field['data_type'],
             $field['description_key'], $cfg['waitformoderator_default']);
+
+        ///// START MR Added 2021 06 03
+        $field = ['type' => 'checkbox', 'name' => 'uniqueusersessions', 'data_type' => PARAM_INT, 'description_key' => 'mod_form_field_uniqueusersessions'];
+        $this->bigbluebuttonbn_mform_add_element($mform, $field['type'], $field['name'], $field['data_type'],
+            $field['description_key'], 0);
+        ///// END  MR Added 2021 06 03
+        
         $field = ['type' => 'hidden', 'name' => 'userlimit', 'data_type' => PARAM_INT, 'description_key' => null];
         if ($cfg['userlimit_editable']) {
             $field['type'] = 'text';
@@ -558,7 +574,7 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
      * @return void
      */
     private function bigbluebuttonbn_mform_add_block_preuploads(&$mform, $cfg) {
-        if ($cfg['preuploadpresentation_enabled']) {
+        if ($cfg['preuploadpresentation_editable']) {
             $mform->addElement('header', 'preuploadpresentation',
                 get_string('mod_form_block_presentation', 'bigbluebuttonbn'));
             $mform->setExpanded('preuploadpresentation');
@@ -602,8 +618,8 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
         $htmladdparticipant = html_writer::tag('div',
             $htmlselectiontype . '&nbsp;&nbsp;' . $htmlselectionoptions . '&nbsp;&nbsp;' . $htmlselectioninput, null);
         $mform->addElement('html', "\n\n");
-        $mform->addElement('static', 'static_add_participant',
-            get_string('mod_form_field_participant_add', 'bigbluebuttonbn'), $htmladdparticipant);
+        $this->bigbluebuttonbn_mform_add_whitelisted_static_element($mform,
+            'static_add_participant', 'mod_form_field_participant_add', $htmladdparticipant);
         $mform->addElement('html', "\n\n");
         // Declare the table.
         $htmltable = new html_table();
@@ -613,8 +629,8 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
         // Render elements for participant list.
         $htmlparticipantlist = html_writer::table($htmltable);
         $mform->addElement('html', "\n\n");
-        $mform->addElement('static', 'static_participant_list',
-            get_string('mod_form_field_participant_list', 'bigbluebuttonbn'), $htmlparticipantlist);
+        $this->bigbluebuttonbn_mform_add_whitelisted_static_element($mform,
+            'static_participant_list', 'mod_form_field_participant_list', $htmlparticipantlist);
         $mform->addElement('html', "\n\n");
     }
 
@@ -701,5 +717,32 @@ class mod_bigbluebuttonbn_mod_form extends moodleform_mod {
         }
         $mform->setDefault($name, $defaultvalue);
         $mform->setType($name, $datatype);
+    }
+
+    /**
+     * Add a static form element that contains safe (non-user provided) HTML to the form.
+     *
+     * This method is designed to add an element in a way that will work in both Moodle and Totara.
+     *
+     * @param object $mform Moodle form object
+     * @param string $name Form element name
+     * @param string $descriptionkey String key for the element label and help description
+     * @param string $html HTML string to be displayed in the static element.
+     *
+     * @return null No return but form element added to $mform as a side-effect.
+     */
+    private function bigbluebuttonbn_mform_add_whitelisted_static_element(&$mform, $name, $descriptionkey, $html) {
+
+        $staticelement = $mform->createElement('static', $name,
+            get_string($descriptionkey, 'bigbluebuttonbn'), $html);
+        if (get_string_manager()->string_exists($descriptionkey.'_help', 'bigbluebuttonbn')) {
+            $mform->addHelpButton($name, $descriptionkey, 'bigbluebuttonbn');
+        }
+        // Totara requires whitelisting of HTML in static elements for security reasons
+        // Check if whitelist method exists, and call only if it does.
+        if (method_exists($staticelement, 'set_allow_xss')) {
+            $staticelement->set_allow_xss(true);
+        }
+        $mform->addElement($staticelement);
     }
 }

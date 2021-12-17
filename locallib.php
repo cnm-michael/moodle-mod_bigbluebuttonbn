@@ -285,18 +285,20 @@ function bigbluebuttonbn_get_recordings_array_fetch_page($mids) {
 
             // Check if there is childs.
             if (isset($recordingxml->breakoutRooms->breakoutRoom)) {
+                $breakoutrooms = [];
                 foreach ($recordingxml->breakoutRooms->breakoutRoom as $breakoutroom) {
-                    $url = \mod_bigbluebuttonbn\locallib\bigbluebutton::action_url(
-                        'getRecordings',
-                        ['recordID' => implode(',', (array) $breakoutroom)]
-                    );
-                    $xml = bigbluebuttonbn_wrap_xml_load_file($url);
-                    if ($xml && $xml->returncode == 'SUCCESS' && isset($xml->recordings)) {
-                        // If there were meetings already created.
-                        foreach ($xml->recordings->recording as $recordingxml) {
-                            $recording = bigbluebuttonbn_get_recording_array_value($recordingxml);
-                            $recordings[$recording['recordID']] = $recording;
-                        }
+                    $breakoutrooms[] = trim((string) $breakoutroom);
+                }
+                $url = \mod_bigbluebuttonbn\locallib\bigbluebutton::action_url(
+                    'getRecordings',
+                    ['recordID' => implode(',', $breakoutrooms)]
+                );
+                $xml = bigbluebuttonbn_wrap_xml_load_file($url);
+                if ($xml && $xml->returncode == 'SUCCESS' && isset($xml->recordings)) {
+                    // If there were meetings already created.
+                    foreach ($xml->recordings->recording as $recordingxml) {
+                        $recording = bigbluebuttonbn_get_recording_array_value($recordingxml);
+                        $recordings[$recording['recordID']] = $recording;
                     }
                 }
             }
@@ -706,11 +708,15 @@ function bigbluebuttonbn_get_users_select(context_course $context, $bbactivity =
             $users += (array) get_enrolled_users($context, '', $g->id, 'u.*', null, 0, 0, true);
         }
     }
-    return array_map(
-            function($u) {
-                return array('id' => $u->id, 'name' => fullname($u));
-            },
-            $users);
+    $userselect = array_map(
+        function($u) {
+            return array('id' => $u->id, 'name' => fullname($u));
+        },
+        $users);
+    uasort($userselect, function($u1, $u2) {
+        return strnatcmp($u1["name"], $u2["name"]);
+    });
+    return $userselect;
 }
 
 /**
@@ -761,7 +767,9 @@ function bigbluebuttonbn_get_roles_select(context $context = null, bool $onlyvie
             $roles[$key] = array('id' => $value->id, 'name' => $value->localname);
         }
     }
-
+    uasort($roles, function($r1, $r2) {
+        return strnatcmp($r1["name"], $r2["name"]);
+    });
     return $roles;
 }
 
@@ -1054,56 +1062,52 @@ function bigbluebuttonbn_get_duration($closingtime) {
  */
 function bigbluebuttonbn_get_presentation_array($context, $presentation, $id = null) {
     global $CFG;
-    if (empty($presentation)) {
-        if ($CFG->bigbluebuttonbn_preuploadpresentation_enabled) {
-            // Item has not presentation but presentation is enabled..
-            // Check if exist some file by default in general mod setting ("presentationdefault").
-            $fs = get_file_storage();
-            $files = $fs->get_area_files(
-                context_system::instance()->id,
-                'mod_bigbluebuttonbn',
-                'presentationdefault',
-                0,
-                "filename",
-                false
-            );
+    if (empty($presentation) || !$CFG->bigbluebuttonbn_preuploadpresentation_editable) {
+        // Item has no presentation but the default is there.
+        // Check if exist some file by default in general mod setting ("presentationdefault").
+        $fs = get_file_storage();
+        $files = $fs->get_area_files(
+            context_system::instance()->id,
+            'mod_bigbluebuttonbn',
+            'presentationdefault',
+            0,
+            "filename",
+            false
+        );
 
-            if (count($files) == 0) {
-                // Not exist file by default in "presentationbydefault" setting.
-                return array('url' => null, 'name' => null, 'icon' => null, 'mimetype_description' => null);
-            }
-
-            // Exists file in general setting to use as default for presentation. Cache image for temp public access.
-            $file = reset($files);
-            unset($files);
-            $pnoncevalue = null;
-            if (!is_null($id)) {
-                // Create the nonce component for granting a temporary public access.
-                $cache = cache::make_from_params(
-                    cache_store::MODE_APPLICATION,
-                    'mod_bigbluebuttonbn',
-                    'presentationdefault_cache'
-                );
-                $pnoncekey = sha1(context_system::instance()->id);
-                /* The item id was adapted for granting public access to the presentation once in order
-                 * to allow BigBlueButton to gather the file. */
-                $pnoncevalue = bigbluebuttonbn_generate_nonce();
-                $cache->set($pnoncekey, array('value' => $pnoncevalue, 'counter' => 0));
-            }
-
-            $url = moodle_url::make_pluginfile_url(
-                $file->get_contextid(),
-                $file->get_component(),
-                $file->get_filearea(),
-                $pnoncevalue,
-                $file->get_filepath(),
-                $file->get_filename()
-            );
-            return (array('name' => $file->get_filename(), 'icon' => file_file_icon($file, 24),
-                'url' => $url->out(false), 'mimetype_description' => get_mimetype_description($file)));
+        if (count($files) == 0) {
+            // Not exist file by default in "presentationbydefault" setting.
+            return array('url' => null, 'name' => null, 'icon' => null, 'mimetype_description' => null);
         }
 
-        return array('url' => null, 'name' => null, 'icon' => null, 'mimetype_description' => null);
+        // Exists file in general setting to use as default for presentation. Cache image for temp public access.
+        $file = reset($files);
+        unset($files);
+        $pnoncevalue = null;
+        if (!is_null($id)) {
+            // Create the nonce component for granting a temporary public access.
+            $cache = cache::make_from_params(
+                cache_store::MODE_APPLICATION,
+                'mod_bigbluebuttonbn',
+                'presentationdefault_cache'
+            );
+            $pnoncekey = sha1(context_system::instance()->id);
+            /* The item id was adapted for granting public access to the presentation once in order
+             * to allow BigBlueButton to gather the file. */
+            $pnoncevalue = bigbluebuttonbn_generate_nonce();
+            $cache->set($pnoncekey, array('value' => $pnoncevalue, 'counter' => 0));
+        }
+
+        $url = moodle_url::make_pluginfile_url(
+            $file->get_contextid(),
+            $file->get_component(),
+            $file->get_filearea(),
+            $pnoncevalue,
+            $file->get_filepath(),
+            $file->get_filename()
+        );
+        return (array('name' => $file->get_filename(), 'icon' => file_file_icon($file, 24),
+            'url' => $url->out(false), 'mimetype_description' => get_mimetype_description($file)));
     }
     $fs = get_file_storage();
     $files = $fs->get_area_files(
@@ -1699,9 +1703,6 @@ function bigbluebuttonbn_get_recording_data_row_type($recording, $bbbsession, $p
     $text = bigbluebuttonbn_get_recording_type_text($playback['type']);
     $href = $CFG->wwwroot . '/mod/bigbluebuttonbn/bbb_view.php?action=play&bn=' . $bbbsession['bigbluebuttonbn']->id .
         '&mid=' . $recording['meetingID'] . '&rid=' . $recording['recordID'] . '&rtype=' . $playback['type'];
-    if (!isset($recording['imported']) || !isset($recording['protected']) || $recording['protected'] === 'false') {
-        $href .= '&href=' . urlencode(trim($playback['url']));
-    }
     $linkattributes = array(
         'id' => 'recording-play-' . $playback['type'] . '-' . $recording['recordID'],
         'class' => 'btn btn-sm btn-default',
@@ -1710,7 +1711,8 @@ function bigbluebuttonbn_get_recording_data_row_type($recording, $bbbsession, $p
         'data-target' => $playback['type'],
         'data-href' => $href,
       );
-    if ($CFG->bigbluebuttonbn_recordings_validate_url && !bigbluebuttonbn_is_bn_server()
+    if (!isset($recording['protected'])
+            && $CFG->bigbluebuttonbn_recordings_validate_url
             && !bigbluebuttonbn_is_valid_resource(trim($playback['url']))) {
         $linkattributes['class'] = 'btn btn-sm btn-warning';
         $linkattributes['title'] = get_string('view_recording_format_errror_unreachable', 'bigbluebuttonbn');
@@ -2097,7 +2099,9 @@ function bigbluebuttonbn_include_recording_table_row($bbbsession, $recording) {
  * @return void
  */
 function bigbluebuttonbn_send_notification_recording_ready($bigbluebuttonbn) {
-    \mod_bigbluebuttonbn\locallib\notifier::notify_recording_ready($bigbluebuttonbn);
+    if ((boolean) \mod_bigbluebuttonbn\locallib\config::get('recordingready_enabled')) {
+        \mod_bigbluebuttonbn\locallib\notifier::notify_recording_ready($bigbluebuttonbn);
+    }
 }
 
 /**
@@ -2205,7 +2209,7 @@ function bigbluebuttonbn_is_bn_server() {
  * @return array
  */
 function bigbluebuttonbn_import_get_courses_for_select(array $bbbsession) {
-    if ($bbbsession['administrator']) {
+    if ($bbbsession['administrator'] || has_capability('moodle/course:view', $bbbsession['context'])) {
         $courses = get_courses('all', 'c.fullname ASC');
         // It includes the name of the site as a course (category 0), so remove the first one.
         unset($courses['1']);
@@ -2693,7 +2697,7 @@ function bigbluebuttonbn_settings_general(&$renderer) {
         );
         $renderer->render_group_element(
             'shared_secret',
-            $renderer->render_group_element_text('shared_secret', BIGBLUEBUTTONBN_DEFAULT_SHARED_SECRET)
+            $renderer->render_group_element_password('shared_secret', BIGBLUEBUTTONBN_DEFAULT_SHARED_SECRET)
         );
     }
 }
@@ -2886,8 +2890,8 @@ function bigbluebuttonbn_settings_preupload(&$renderer) {
         $renderer->render_group_header('preuploadpresentation', null, $preuploaddescripion);
         if (extension_loaded('curl')) {
             $renderer->render_group_element(
-                'preuploadpresentation_enabled',
-                $renderer->render_group_element_checkbox('preuploadpresentation_enabled', 0)
+                'preuploadpresentation_editable',
+                $renderer->render_group_element_checkbox('preuploadpresentation_editable', 0)
             );
         }
     }
@@ -3277,6 +3281,10 @@ function bigbluebuttonbn_settings_default_messages(&$renderer) {
         'welcome_default',
         $renderer->render_group_element_textarea('welcome_default', '', PARAM_RAW)
     );
+    $renderer->render_group_element(
+        'welcome_editable',
+        $renderer->render_group_element_checkbox('welcome_editable', 1)
+    );
 }
 
 /**
@@ -3644,6 +3652,8 @@ function bigbluebuttonbn_create_meeting_metadata(&$bbbsession) {
         'bbb-recording-name' => bigbluebuttonbn_html2text($bbbsession['meetingname'], 64),
         'bbb-recording-description' => bigbluebuttonbn_html2text($bbbsession['meetingdescription'], 64),
         'bbb-recording-tags' => bigbluebuttonbn_get_tags($bbbsession['cm']->id), // Same as $id.
+        'bbb-meeting-size-hint' => count_enrolled_users(
+                context_course::instance($bbbsession['course']->id), '', $bbbsession['group']),
     ];
     // Special metadata for recording processing.
     if ((boolean) \mod_bigbluebuttonbn\locallib\config::get('recordingstatus_enabled')) {
